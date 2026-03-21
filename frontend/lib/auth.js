@@ -1,110 +1,67 @@
-import axios from 'axios';
+'use client';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+import { createContext, useContext, useState, useEffect } from 'react';
 
-const api = axios.create({
-  baseURL: API_URL,
-  withCredentials: true,
-});
+const AuthContext = createContext({});
 
-// ✅ Attach JWT token safely (SSR safe)
-api.interceptors.request.use((config) => {
-  let token = null;
+export function AuthProvider({ children }) {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  if (typeof window !== 'undefined') {
-    const Cookies = require('js-cookie');
-    token = Cookies.get('token') || localStorage.getItem('token');
-  }
+  useEffect(() => {
+    let token = null;
 
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
+    if (typeof window !== 'undefined') {
+      const Cookies = require('js-cookie');
 
-  return config;
-});
+      const stored = localStorage.getItem('user');
+      token = Cookies.get('token') || localStorage.getItem('token');
 
-// ✅ Handle 401 safely
-api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      if (typeof window !== 'undefined') {
-        const Cookies = require('js-cookie');
-        Cookies.remove('token');
-
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        window.location.href = '/auth/login';
+      if (stored && token) {
+        setUser(JSON.parse(stored));
       }
     }
-    return Promise.reject(error);
-  }
-);
 
-// Auth
-export const authAPI = {
-  register: (data) => api.post('/auth/register', data),
-  login: (data) => api.post('/auth/login', data),
-  getMe: () => api.get('/auth/me'),
-  updateProfile: (data) => api.put('/auth/profile', data),
-};
+    setLoading(false);
+  }, []);
 
-// Products
-export const productsAPI = {
-  getAll: (params) => api.get('/products', { params }),
-  getById: (id) => api.get(`/products/${id}`),
-  create: (data) =>
-    api.post('/products', data, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    }),
-  update: (id, data) =>
-    api.put(`/products/${id}`, data, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    }),
-  delete: (id) => api.delete(`/products/${id}`),
-  getMyProducts: () => api.get('/products/farmer/my-products'),
-};
+  const login = (userData, token) => {
+    setUser(userData);
 
-// Cart
-export const cartAPI = {
-  get: () => api.get('/cart'),
-  add: (data) => api.post('/cart/add', data),
-  update: (data) => api.put('/cart/update', data),
-  remove: (data) => api.delete('/cart/remove', { data }),
-  clear: () => api.delete('/cart/clear'),
-};
+    if (typeof window !== 'undefined') {
+      const Cookies = require('js-cookie');
 
-// Orders
-export const ordersAPI = {
-  create: (data) => api.post('/orders/create', data),
-  getCustomerOrders: () => api.get('/orders/customer'),
-  getCustomerOrder: (id) => api.get(`/orders/customer/${id}`),
-  getFarmerOrders: () => api.get('/orders/farmer'),
-  updateStatus: (data) => api.put('/orders/update-status', data),
-  getFarmerStats: () => api.get('/orders/farmer/stats'),
-};
+      Cookies.set('token', token, { expires: 7 });
+      localStorage.setItem('token', token);
+      localStorage.setItem('user', JSON.stringify(userData));
+    }
+  };
 
-// Farmers
-export const farmersAPI = {
-  getProfile: (userId) => api.get(`/farmers/${userId}`),
-  getMyProfile: () => api.get('/farmers/me/profile'),
-  createProfile: (data) =>
-    api.post('/farmers/profile', data, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    }),
-  updateProfile: (data) =>
-    api.put('/farmers/profile', data, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    }),
-};
+  const logout = () => {
+    setUser(null);
 
-// Admin
-export const adminAPI = {
-  getStats: () => api.get('/admin/stats'),
-  getPendingFarmers: () => api.get('/admin/farmers/pending'),
-  approveFarmer: (id) => api.put(`/admin/farmers/approve/${id}`),
-  getUsers: (params) => api.get('/admin/users', { params }),
-  getOrders: (params) => api.get('/admin/orders', { params }),
-};
+    if (typeof window !== 'undefined') {
+      const Cookies = require('js-cookie');
 
-export default api;
+      Cookies.remove('token');
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+    }
+  };
+
+  const updateUser = (userData) => {
+    setUser(userData);
+
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('user', JSON.stringify(userData));
+    }
+  };
+
+  return (
+    <AuthContext.Provider value={{ user, login, logout, updateUser, loading }}>
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+export const useAuth = () => useContext(AuthContext);
