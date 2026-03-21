@@ -1,5 +1,4 @@
 import axios from 'axios';
-import Cookies from 'js-cookie';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
@@ -8,22 +7,31 @@ const api = axios.create({
   withCredentials: true,
 });
 
-// Attach JWT token to every request
+// ✅ Attach JWT token safely (SSR safe)
 api.interceptors.request.use((config) => {
-  const token = Cookies.get('token') || (typeof window !== 'undefined' ? localStorage.getItem('token') : null);
+  let token = null;
+
+  if (typeof window !== 'undefined') {
+    const Cookies = require('js-cookie');
+    token = Cookies.get('token') || localStorage.getItem('token');
+  }
+
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+
   return config;
 });
 
-// Handle 401 globally
+// ✅ Handle 401 safely
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      Cookies.remove('token');
       if (typeof window !== 'undefined') {
+        const Cookies = require('js-cookie');
+        Cookies.remove('token');
+
         localStorage.removeItem('token');
         localStorage.removeItem('user');
         window.location.href = '/auth/login';
@@ -45,8 +53,14 @@ export const authAPI = {
 export const productsAPI = {
   getAll: (params) => api.get('/products', { params }),
   getById: (id) => api.get(`/products/${id}`),
-  create: (data) => api.post('/products', data, { headers: { 'Content-Type': 'multipart/form-data' } }),
-  update: (id, data) => api.put(`/products/${id}`, data, { headers: { 'Content-Type': 'multipart/form-data' } }),
+  create: (data) =>
+    api.post('/products', data, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
+  update: (id, data) =>
+    api.put(`/products/${id}`, data, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
   delete: (id) => api.delete(`/products/${id}`),
   getMyProducts: () => api.get('/products/farmer/my-products'),
 };
@@ -74,8 +88,14 @@ export const ordersAPI = {
 export const farmersAPI = {
   getProfile: (userId) => api.get(`/farmers/${userId}`),
   getMyProfile: () => api.get('/farmers/me/profile'),
-  createProfile: (data) => api.post('/farmers/profile', data, { headers: { 'Content-Type': 'multipart/form-data' } }),
-  updateProfile: (data) => api.put('/farmers/profile', data, { headers: { 'Content-Type': 'multipart/form-data' } }),
+  createProfile: (data) =>
+    api.post('/farmers/profile', data, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
+  updateProfile: (data) =>
+    api.put('/farmers/profile', data, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
 };
 
 // Admin
